@@ -1,0 +1,18 @@
+{
+  "name": "gestao-stock-rapida",
+  "version": "1.0.0",
+  "description": "Plataforma rápida de gestão de stock",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "mysql2": "^3.0.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  }
+}
