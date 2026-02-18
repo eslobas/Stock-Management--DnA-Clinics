@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestão Stock - Rápido</title>
+    <title>Gestão Stock</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; padding: 20px; color: #333; }
@@ -26,8 +26,30 @@
         th { background: #f8f9fa; padding: 12px 15px; text-align: left; font-weight: 600; color: #2c3e50; border-bottom: 2px solid #eaeaea; }
         td { padding: 12px 15px; border-bottom: 1px solid #eaeaea; }
         tr:hover { background: #f9f9f9; }
-        .stock-baixo { background-color: #fff3cd; }  /* Amarelo claro para stock baixo */
-        .stock-baixo:hover { background-color: #ffe69b; }
+        
+        /* ESTILOS PARA STOCK ZERO */
+        .stock-zero { 
+            background-color: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        .stock-zero:hover { 
+            background-color: #ffcdd2;
+        }
+        .stock-zero .aviso-zero {
+            color: #f44336;
+            font-weight: bold;
+            margin-left: 5px;
+            animation: piscar 1.5s infinite;
+        }
+        @keyframes piscar {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .stock-baixo { background-color: #fff3cd; }
+        .aviso-icone { color: #e67e22; margin-left: 5px; font-weight: bold; }
+        
         .acoes { white-space: nowrap; }
         .acoes button { width: auto; padding: 5px 10px; margin: 0 2px; font-size: 12px; }
         .qtd-input { width: 60px; text-align: center; padding: 5px; }
@@ -36,16 +58,24 @@
         .mensagem { padding: 10px; border-radius: 6px; margin-bottom: 15px; display: none; }
         .sucesso { background: #d4edda; color: #155724; }
         .erro { background: #f8d7da; color: #721c24; }
-        .stats { display: flex; gap: 15px; margin-top: 20px; }
-        .stat { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1; text-align: center; }
-        .stat-numero { font-size: 24px; font-weight: bold; color: #3498db; }
+        .aviso-zero-msg { background: #ffebee; color: #c62828; border-left: 4px solid #f44336; }
+        
+        .stats { display: flex; gap: 15px; margin-top: 20px; flex-wrap: wrap; }
+        .stat { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); flex: 1; text-align: center; min-width: 100px; }
+        .stat-numero { font-size: 24px; font-weight: bold; }
         .stat-label { font-size: 12px; color: #7f8c8d; text-transform: uppercase; margin-top: 5px; }
-        .aviso-icone { color: #e67e22; margin-left: 5px; font-weight: bold; }
+        
+        .stat-total { border-top: 3px solid #3498db; }
+        .stat-total .stat-numero { color: #3498db; }
+        .stat-baixo { border-top: 3px solid #e67e22; }
+        .stat-baixo .stat-numero { color: #e67e22; }
+        .stat-zero { border-top: 3px solid #f44336; }
+        .stat-zero .stat-numero { color: #f44336; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📦 Gestão Rápida de Stock</h1>
+        <h1>📦 Gestão de Stock (AGORA COM STOCK ZERO)</h1>
         
         <div class="mensagem" id="mensagem"></div>
         
@@ -54,7 +84,7 @@
                 <h2>Adicionar Produto</h2>
                 <div class="input-group">
                     <input type="text" id="nomeNovo" placeholder="Nome do produto" autocomplete="off">
-                    <input type="number" id="quantidadeNovo" placeholder="Quantidade" value="1" min="1">
+                    <input type="number" id="quantidadeNovo" placeholder="Quantidade" value="1" min="0">
                 </div>
                 <button class="btn btn-verde" onclick="adicionarProduto()">➕ Adicionar</button>
             </div>
@@ -62,18 +92,23 @@
             <div class="card">
                 <h2>Buscar Produto</h2>
                 <input type="text" id="busca" placeholder="Digite para buscar..." onkeyup="buscarProdutos()" autocomplete="off">
+                
                 <div class="stats">
-                    <div class="stat">
+                    <div class="stat stat-total">
                         <div class="stat-numero" id="totalProdutos">0</div>
                         <div class="stat-label">Total Produtos</div>
                     </div>
-                    <div class="stat">
+                    <div class="stat stat-total">
                         <div class="stat-numero" id="totalQuantidade">0</div>
                         <div class="stat-label">Total Unidades</div>
                     </div>
-                    <div class="stat">
+                    <div class="stat stat-baixo">
                         <div class="stat-numero" id="totalStockBaixo">0</div>
                         <div class="stat-label">Stock Baixo (<3)</div>
+                    </div>
+                    <div class="stat stat-zero">
+                        <div class="stat-numero" id="totalStockZero">0</div>
+                        <div class="stat-label">⚠️ SEM STOCK</div>
                     </div>
                 </div>
             </div>
@@ -128,14 +163,13 @@
             }
         }
         
-        // Função para validar quantidade antes de adicionar/atualizar
-        function validarQuantidade(quantidade) {
-            if (quantidade <= 0) {
-                mostrarMensagem('❌ A quantidade deve ser maior que zero!', 'erro');
-                return false;
+        // FUNÇÃO DE VALIDAÇÃO - APENAS AVISA, NÃO BLOQUEIA
+        function confirmarQuantidade(quantidade, acao) {
+            if (quantidade === 0) {
+                return confirm('⚠️ ATENÇÃO: Está a ' + acao + ' um produto com STOCK ZERO.\n\nTem a certeza?');
             }
             if (quantidade <= 3) {
-                return confirm('⚠️ Está a registar um produto com quantidade muito baixa (≤ 3). Deseja continuar?');
+                return confirm('⚠️ Está a ' + acao + ' um produto com stock baixo (≤ 3). Deseja continuar?');
             }
             return true;
         }
@@ -149,9 +183,9 @@
                 return;
             }
             
-            // Validação de quantidade
-            if (!validarQuantidade(quantidade)) {
-                return; // Não adiciona se a validação falhar
+            // Confirma (mas não bloqueia)
+            if (!confirmarQuantidade(quantidade, 'adicionar')) {
+                return;
             }
             
             try {
@@ -160,24 +194,36 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ nome, quantidade })
                 });
+                
                 if (response.ok) {
                     document.getElementById('nomeNovo').value = '';
                     document.getElementById('quantidadeNovo').value = '1';
-                    carregarProdutos();
-                    mostrarMensagem('✅ Produto adicionado com sucesso!', 'sucesso');
+                    await carregarProdutos(); // Aguarda carregar
+                    
+                    if (quantidade === 0) {
+                        mostrarMensagem('✅ Produto adicionado com STOCK ZERO!', 'aviso-zero-msg');
+                    } else {
+                        mostrarMensagem('✅ Produto adicionado com sucesso!', 'sucesso');
+                    }
+                } else {
+                    const erro = await response.text();
+                    mostrarMensagem('Erro: ' + erro, 'erro');
                 }
             } catch (erro) {
-                mostrarMensagem('Erro ao adicionar produto', 'erro');
+                mostrarMensagem('Erro ao adicionar produto: ' + erro.message, 'erro');
             }
         }
         
         function iniciarEdicao(id) {
             const produto = produtos.find(p => p.id === id);
             if (!produto) return;
+            
             modoEdicao = true;
             produtoEditando = id;
+            
             document.getElementById('nomeNovo').value = produto.nome;
             document.getElementById('quantidadeNovo').value = produto.quantidade;
+            
             const btn = document.querySelector('.btn-verde');
             btn.textContent = '🔄 Atualizar';
             btn.onclick = atualizarProduto;
@@ -192,8 +238,8 @@
                 return;
             }
             
-            // Validação de quantidade
-            if (!validarQuantidade(quantidade)) {
+            // Confirma (mas não bloqueia)
+            if (!confirmarQuantidade(quantidade, 'atualizar')) {
                 return;
             }
             
@@ -203,55 +249,85 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ nome, quantidade })
                 });
+                
                 if (response.ok) {
                     resetarFormulario();
-                    carregarProdutos();
-                    mostrarMensagem('✅ Produto atualizado com sucesso!', 'sucesso');
+                    await carregarProdutos();
+                    
+                    if (quantidade === 0) {
+                        mostrarMensagem('✅ Produto atualizado com STOCK ZERO!', 'aviso-zero-msg');
+                    } else {
+                        mostrarMensagem('✅ Produto atualizado com sucesso!', 'sucesso');
+                    }
+                } else {
+                    const erro = await response.text();
+                    mostrarMensagem('Erro: ' + erro, 'erro');
                 }
             } catch (erro) {
-                mostrarMensagem('Erro ao atualizar produto', 'erro');
+                mostrarMensagem('Erro ao atualizar produto: ' + erro.message, 'erro');
             }
         }
         
         async function eliminarProduto(id) {
             if (!confirm('Tem certeza que deseja eliminar este produto?')) return;
+            
             try {
-                const response = await fetch(`/api/produtos/${id}`, { method: 'DELETE' });
+                const response = await fetch(`/api/produtos/${id}`, { 
+                    method: 'DELETE' 
+                });
+                
                 if (response.ok) {
-                    carregarProdutos();
+                    await carregarProdutos();
                     mostrarMensagem('🗑️ Produto eliminado com sucesso!', 'sucesso');
+                } else {
+                    mostrarMensagem('Erro ao eliminar produto', 'erro');
                 }
             } catch (erro) {
-                mostrarMensagem('Erro ao eliminar produto', 'erro');
+                mostrarMensagem('Erro: ' + erro.message, 'erro');
             }
         }
         
+        // FUNÇÃO CORRIGIDA - atualizar quantidade rápida
         async function atualizarQuantidadeRapida(id, novaQuantidade) {
-            // Validar a nova quantidade
-            if (novaQuantidade <= 0) {
-                mostrarMensagem('❌ A quantidade deve ser maior que zero!', 'erro');
-                // Reverter para o valor anterior (recarregar produtos)
-                carregarProdutos();
-                return;
-            }
+            // Garantir que é número
+            novaQuantidade = parseInt(novaQuantidade) || 0;
             
-            if (novaQuantidade <= 3) {
-                if (!confirm('⚠️ Está a definir uma quantidade muito baixa (≤ 3). Deseja continuar?')) {
+            console.log('A atualizar produto', id, 'para', novaQuantidade); // DEBUG
+            
+            // Confirmar se for 0 ou ≤3
+            if (novaQuantidade === 0) {
+                if (!confirm('⚠️ ATENÇÃO: Está a definir STOCK ZERO para este produto.\n\nTem a certeza?')) {
+                    carregarProdutos(); // Reverte
+                    return;
+                }
+            } else if (novaQuantidade <= 3) {
+                if (!confirm('⚠️ Está a definir stock baixo (≤ 3). Deseja continuar?')) {
                     carregarProdutos(); // Reverte
                     return;
                 }
             }
             
             try {
-                await fetch(`/api/produtos/${id}/quantidade`, {
+                const response = await fetch(`/api/produtos/${id}/quantidade`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ quantidade: novaQuantidade })
                 });
-                carregarProdutos();
+                
+                if (response.ok) {
+                    await carregarProdutos(); // Aguarda carregar
+                    
+                    if (novaQuantidade === 0) {
+                        mostrarMensagem('⚠️ Produto com STOCK ZERO atualizado!', 'aviso-zero-msg');
+                    }
+                } else {
+                    const erro = await response.text();
+                    mostrarMensagem('Erro: ' + erro, 'erro');
+                    await carregarProdutos(); // Reverte em caso de erro
+                }
             } catch (erro) {
-                mostrarMensagem('Erro ao atualizar quantidade', 'erro');
-                carregarProdutos();
+                mostrarMensagem('Erro ao atualizar quantidade: ' + erro.message, 'erro');
+                await carregarProdutos(); // Reverte em caso de erro
             }
         }
         
@@ -261,23 +337,27 @@
             
             listaProdutos.forEach(produto => {
                 const tr = document.createElement('tr');
-                const isStockBaixo = produto.quantidade < 3;
+                const isStockZero = produto.quantidade === 0;
+                const isStockBaixo = produto.quantidade > 0 && produto.quantidade < 3;
                 
-                // Adiciona classe se stock baixo
-                if (isStockBaixo) {
+                if (isStockZero) {
+                    tr.className = 'stock-zero';
+                } else if (isStockBaixo) {
                     tr.className = 'stock-baixo';
                 }
                 
-                // Nome com ícone de aviso se aplicável
-                const nomeDisplay = isStockBaixo 
-                    ? `${produto.nome} <span class="aviso-icone">⚠️</span>` 
-                    : produto.nome;
+                let nomeDisplay = produto.nome;
+                if (isStockZero) {
+                    nomeDisplay += ' <span class="aviso-zero">🚫 SEM STOCK!</span>';
+                } else if (isStockBaixo) {
+                    nomeDisplay += ' <span class="aviso-icone">⚠️</span>';
+                }
                 
                 tr.innerHTML = `
                     <td>${produto.id}</td>
                     <td>${nomeDisplay}</td>
                     <td>
-                        <input type="number" class="qtd-input" value="${produto.quantidade}" min="1"
+                        <input type="number" class="qtd-input" value="${produto.quantidade}" min="0"
                                onchange="atualizarQuantidadeRapida(${produto.id}, this.value)">
                     </td>
                     <td class="acoes">
@@ -295,6 +375,7 @@
             produtoEditando = null;
             document.getElementById('nomeNovo').value = '';
             document.getElementById('quantidadeNovo').value = '1';
+            
             const btn = document.querySelector('.btn-verde');
             btn.textContent = '➕ Adicionar';
             btn.onclick = adicionarProduto;
@@ -303,11 +384,13 @@
         function atualizarStats() {
             const totalProdutos = produtos.length;
             const totalQuantidade = produtos.reduce((sum, p) => sum + p.quantidade, 0);
-            const totalStockBaixo = produtos.filter(p => p.quantidade < 3).length;
+            const totalStockBaixo = produtos.filter(p => p.quantidade > 0 && p.quantidade < 3).length;
+            const totalStockZero = produtos.filter(p => p.quantidade === 0).length;
             
             document.getElementById('totalProdutos').textContent = totalProdutos;
             document.getElementById('totalQuantidade').textContent = totalQuantidade;
             document.getElementById('totalStockBaixo').textContent = totalStockBaixo;
+            document.getElementById('totalStockZero').textContent = totalStockZero;
         }
         
         function mostrarMensagem(texto, tipo) {
@@ -315,7 +398,10 @@
             msg.textContent = texto;
             msg.className = `mensagem ${tipo}`;
             msg.style.display = 'block';
-            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+            
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 5000);
         }
         
         // Permitir adicionar/atualizar com Enter
