@@ -14,7 +14,7 @@ app.use(express.static('public'));
 const dbConfig = {
     host: 'localhost',
     user: 'root',           // 👈 CONFIRMA QUE É 'root'
-    password: '1Diogoedani#',           // 👈 SE TIVER PASSWORD, METE AQUI
+    password: '',           // 👈 SE TIVER PASSWORD, METE AQUI
     database: 'gestao_stock', // 👈 CONFIRMA QUE A BASE EXISTE
     waitForConnections: true,
     connectionLimit: 10,
@@ -33,7 +33,7 @@ const pool = mysql.createPool(dbConfig);
     try {
         const connection = await pool.getConnection();
         console.log('✅ MySQL conectado com sucesso!');
-        
+       
         // Verificar se a tabela existe
         const [tables] = await connection.query('SHOW TABLES LIKE "produtos"');
         if (tables.length === 0) {
@@ -50,12 +50,12 @@ const pool = mysql.createPool(dbConfig);
             `);
         } else {
             console.log('✅ Tabela "produtos" existe');
-            
+           
             // Contar produtos
             const [count] = await connection.query('SELECT COUNT(*) as total FROM produtos');
             console.log(`📊 Total de produtos na base: ${count[0].total}`);
         }
-        
+       
         connection.release();
     } catch (err) {
         console.error('❌ ERRO CRÍTICO AO CONECTAR AO MYSQL:');
@@ -73,7 +73,7 @@ const pool = mysql.createPool(dbConfig);
 // GET todos os produtos (COM DEBUG)
 app.get('/api/produtos', async (req, res) => {
     console.log('📥 GET /api/produtos - a processar...');
-    
+   
     try {
         const [rows] = await pool.query('SELECT * FROM produtos ORDER BY nome');
         console.log(`📤 Enviando ${rows.length} produtos`);
@@ -81,8 +81,8 @@ app.get('/api/produtos', async (req, res) => {
     } catch (err) {
         console.error('❌ ERRO NO GET PRODUTOS:', err.message);
         console.error('Stack:', err.stack);
-        res.status(500).json({ 
-            error: 'Erro ao buscar produtos', 
+        res.status(500).json({
+            error: 'Erro ao buscar produtos',
             detalhe: err.message,
             sql: err.sql || null
         });
@@ -108,16 +108,16 @@ app.get('/api/produtos/busca/:termo', async (req, res) => {
 app.post('/api/produtos', async (req, res) => {
     try {
         const { nome, quantidade } = req.body;
-        
+       
         const [result] = await pool.query(
             'INSERT INTO produtos (nome, quantidade) VALUES (?, ?)',
             [nome, quantidade]
         );
-        
-        res.json({ 
-            id: result.insertId, 
-            nome, 
-            quantidade 
+       
+        res.json({
+            id: result.insertId,
+            nome,
+            quantidade
         });
     } catch (err) {
         console.error('Erro ao adicionar produto:', err);
@@ -129,12 +129,12 @@ app.post('/api/produtos', async (req, res) => {
 app.put('/api/produtos/:id', async (req, res) => {
     try {
         const { nome, quantidade } = req.body;
-        
+       
         await pool.query(
             'UPDATE produtos SET nome = ?, quantidade = ? WHERE id = ?',
             [nome, quantidade, req.params.id]
         );
-        
+       
         res.json({ success: true });
     } catch (err) {
         console.error('Erro ao atualizar produto:', err);
@@ -146,12 +146,12 @@ app.put('/api/produtos/:id', async (req, res) => {
 app.patch('/api/produtos/:id/quantidade', async (req, res) => {
     try {
         const { quantidade } = req.body;
-        
+       
         await pool.query(
             'UPDATE produtos SET quantidade = ? WHERE id = ?',
             [quantidade, req.params.id]
         );
-        
+       
         res.json({ success: true });
     } catch (err) {
         console.error('Erro ao atualizar quantidade:', err);
